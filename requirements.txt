@@ -1,5 +1,4 @@
-ultralytics
+ultralytics>=8.4
 flask
 waitress
 pillow
-roboflow

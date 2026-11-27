@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>YOLOv8 Dental Object Detection</title>
+    <title>YOLO26 Dental Object Detection</title>
     <style>
       body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -70,6 +70,15 @@
        * @param file Uploaded file object
        * @param boxes Array of bounding boxes in format [[x1,y1,x2,y2,object_type,probability],...]
        */
+       const CLASS_COLORS = {
+           "Prosthesis": "#00E5FF",
+           "Root Canal": "#FFD600",
+           "caries": "#FF1744",
+           "impaction": "#D500F9",
+           "restoration": "#00E676",
+           "root stump": "#FF9100",
+       };
+
        function draw_image_and_boxes(file, boxes) {
         const img = new Image();
         img.src = URL.createObjectURL(file);
@@ -79,11 +88,12 @@
             canvas.height = img.height;
             const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0);
-            ctx.strokeStyle = "#00FF00";
             ctx.lineWidth = 3;
             ctx.font = "18px serif";
             boxes.forEach(([x1, y1, x2, y2, label, confidence]) => {
-                // Draw rectangle around the object
+                // Draw rectangle around the object, coloured by class
+                const color = CLASS_COLORS[label] || "#00FF00";
+                ctx.strokeStyle = color;
                 ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
 
                 // Prepare text to display (label and confidence)
@@ -93,7 +103,7 @@
                 const textWidth = ctx.measureText(text).width;
 
                 // Draw background rectangle for text
-                ctx.fillStyle = "#00FF00";
+                ctx.fillStyle = color;
                 ctx.fillRect(x1, y1 - 25, textWidth + 10, 25);
 
                 // Draw text (label and confidence)
