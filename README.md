@@ -1,6 +1,8 @@
 # TeethXrayAI
-A computer vision project for AI teeth xray analysis. This repo features a yolov8 object detection model based on the [dentex dataset](https://universe.roboflow.com/dentex/dentex-3xe7e) and a simple web interface for querying it. 
+A computer vision project for AI teeth xray analysis. This repo features a YOLO26 object detection model trained on the [panoramic dental dataset](https://universe.roboflow.com/panoramicmetaldetection/dental-iyn0e) (CC BY 4.0) and a simple web interface for querying it.
 If you dont want to selfhost it then you can use my personal deployment https://xray.cyphersec.eu/
+
+The model detects 6 classes on panoramic xrays: Prosthesis, Root Canal, caries, impaction, restoration and root stump.
 
 ![Screenshot](images/img1.png)
 
@@ -10,9 +12,7 @@ If you dont want to selfhost it then you can use my personal deployment https://
 3. Evaluation
 
 ## Self Hosting
-If you dont want to use the demo deployment and deploy the webUI yourself you have 2 options. You can either download the pretrained yolov8 model that i trained or you can train it yourself.
-Download link: [dental model](https://xray.cyphersec.eu/download)
- After downloading it/training it just pop it into the root of this repo and name it "best.pt". After that run 
+The trained YOLO26m model ships in the root of this repo as `best.pt`. If you train your own, replace `best.pt` with it (or point the `MODEL_PATH` environment variable at it). Then run
 ```
 python3 -m pip install -r requirements.txt
 ```
@@ -23,23 +23,36 @@ python3 object_detector.py
 This should make the UI available on http://127.0.0.1:8080
 ## Training Proccess
 For training i used the YOLO package from the python ultralytics libary. Luckily this makes the training fairly easy.
-Step 1: Head over to roboflow and create an account. Once youre logged in go to https://universe.roboflow.com/dentex/dentex-3xe7e/dataset/2 and choose download dataset. Instead of downloading it directly i would recommend to get the download code in python and running that as the dataset has to be in ~/datasets/dentex-2/ in order for our training tool to find it. After the dir is in that location run 
+Step 1: Head over to roboflow and create an account. Download version 1 of https://universe.roboflow.com/panoramicmetaldetection/dental-iyn0e in YOLO26 format, either from the website or with the roboflow python package:
 
 ```
-pip3 install ultralytics roboflow && yolo train data=data.yaml model=yolov8n.pt epochs=50 imgsz=640 cache=True
+pip3 install ultralytics roboflow
 ```
-The model will be saved in ~/datasets/dentex-2/runs/detect/train/weights/best.pt.
+```python
+from roboflow import Roboflow
+rf = Roboflow(api_key="YOUR_API_KEY")
+rf.workspace("panoramicmetaldetection").project("dental-iyn0e").version(1).download("yolo26", location="dental-data")
+```
+Step 2: train from the pretrained YOLO26m weights. Early stopping ended this run at epoch 88 (best epoch 58) after 22 minutes on an RTX 5090:
+
+```
+yolo train data=dental-data/data.yaml model=yolo26m.pt epochs=150 patience=30 imgsz=640 batch=32 cache=ram seed=0
+```
+The model will be saved in runs/detect/train/weights/best.pt.
 ## Evaluation
-For the hyperparameters that i suggested my metrics are 
+Metrics of the included `best.pt` on the held-out test split (`yolo val split=test`):
 ```
-Ultralytics YOLOv8.0.227 🚀 Python-3.10.12 torch-2.1.0+cu121 CUDA:0 (Tesla T4, 15102MiB)
-Model summary (fused): 168 layers, 3006428 parameters, 0 gradients, 8.1 GFLOPs
-                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% 2/2 [00:00<00:00,  4.30it/s]
-                   all         40        218        0.4      0.533      0.458      0.283
-                Caries         40        142      0.297      0.556      0.336      0.228
-           Deep Caries         40         40      0.481      0.475      0.486      0.305
-              Impacted         40         26      0.633          1      0.878      0.509
-     Periapical Lesion         40         10      0.191        0.1       0.13     0.0902
-Speed: 0.1ms preprocess, 1.9ms inference, 0.0ms loss, 2.4ms postprocess per image
+Ultralytics 8.4.220 🚀 Python-3.12.3 torch-2.15.0+cu132 CUDA:0 (NVIDIA GeForce RTX 5090, 32109MiB)
+YOLO26m summary (fused): 130 layers, 20,354,078 parameters, 0 gradients, 68.1 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95)
+                   all        284       1213      0.686      0.715      0.713      0.474
+            Prosthesis         91        184      0.845      0.935      0.948      0.799
+            Root Canal         94        238      0.672      0.758      0.723      0.361
+                caries        106        209      0.526      0.321      0.346      0.118
+             impaction        139        349      0.804      0.874      0.888      0.709
+           restoration         58        154      0.788      0.857      0.871      0.543
+            root stump         38         79      0.483      0.544      0.502      0.316
 ```
-look at them and contemplate wether you would get better results training it yourself.
+Caries is the weakest class by far, so treat caries detections with extra caution.
+
+This is a research/demo project and not a medical device: do not use it for diagnosis.
